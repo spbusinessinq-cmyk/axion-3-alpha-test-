@@ -56,85 +56,11 @@ function severityDots(s: number) {
 
 /* ── Signal Fetch ───────────────────────────────────────────────────────── */
 
-const FEED_SOURCES: { url: string; defaultDomain: string }[] = [
-  // World / Geopolitics
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",           defaultDomain: "Global Affairs" },
-  { url: "https://feeds.reuters.com/Reuters/worldNews",                       defaultDomain: "Global Affairs" },
-  { url: "https://feeds.bbci.co.uk/news/world/rss.xml",                       defaultDomain: "Global Affairs" },
-  { url: "https://www.aljazeera.com/xml/rss/all.xml",                         defaultDomain: "Global Affairs" },
-  { url: "https://feeds.feedburner.com/foreignpolicy/latest",                 defaultDomain: "Global Affairs" },
-  // Defense / Security
-  { url: "https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml", defaultDomain: "Security / Defense" },
-  { url: "https://breakingdefense.com/feed/",                                 defaultDomain: "Security / Defense" },
-  { url: "https://www.thedrive.com/the-war-zone/rss",                         defaultDomain: "Security / Defense" },
-  // Cyber / Infrastructure
-  { url: "https://www.cisa.gov/news.xml",                                     defaultDomain: "Technology Systems" },
-  { url: "https://krebsonsecurity.com/feed/",                                 defaultDomain: "Technology Systems" },
-  { url: "https://www.darkreading.com/rss.xml",                               defaultDomain: "Technology Systems" },
-  // Markets / Energy / Shipping
-  { url: "https://feeds.reuters.com/Reuters/businessNews",                    defaultDomain: "Markets" },
-  { url: "https://www.eia.gov/rss/news.xml",                                  defaultDomain: "Markets" },
-  // Domestic / Policy
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",        defaultDomain: "Domestic / Policy" },
-  { url: "https://thehill.com/feed/",                                         defaultDomain: "Domestic / Policy" },
-];
-
-function classifyDomain(title: string, defaultDomain: string): string {
-  if (/military|missile|drone|defense|navy|air.?force|troops|combat|weapon|armament|warship|fighter|bomb|strike|war|conflict|battalion|artillery/i.test(title)) return "Security / Defense";
-  if (/cyber|ransomware|hack|malware|infrastructure|ai\b|compute|chip|cloud|data.?breach|vulnerability|exploit|zero.?day|botnet/i.test(title)) return "Technology Systems";
-  if (/market|oil|energy|shipping|trade|treasury|inflation|equity|tariff|sanction|commodity|port|supply.?chain|crude|lng|brent|nasdaq|s&p|dow/i.test(title)) return "Markets";
-  if (/white house|senate|congress|executive|agency|department|administration|federal|election|legislation|policy|vote|president|minister|parliament/i.test(title)) return "Domestic / Policy";
-  return defaultDomain;
-}
-
-async function fetchOneFeed(url: string, defaultDomain: string, raw: FeedEvent[], PER_FEED: number) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
-  try {
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, { cache: "no-store", signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) return;
-    const text = await res.text();
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, "text/xml");
-    const items = Array.from(xml.querySelectorAll("item")).slice(0, PER_FEED);
-    items.forEach((item, i) => {
-      const title = (item.querySelector("title")?.textContent || "").trim();
-      if (!title || title.length < 8) return;
-      const summary = item.querySelector("description")?.textContent || "";
-      const domain = classifyDomain(title, defaultDomain);
-      raw.push({
-        id: `${url}-${i}-${title.slice(0, 20)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        source: "RSR Signal Feed",
-        domain,
-        title,
-        summary: summary.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().slice(0, 220),
-        severity: Math.floor(Math.random() * 4) + 1,
-        confidence: 68 + Math.floor(Math.random() * 27),
-        timestamp: new Date().toISOString(),
-      });
-    });
-  } catch { clearTimeout(timer); }
-}
-
 async function fetchSignals(): Promise<FeedEvent[]> {
-  const PER_FEED = 12;
-  const raw: FeedEvent[] = [];
-  const globalTimeout = new Promise<void>(res => setTimeout(res, 9000));
-
-  await Promise.race([
-    Promise.allSettled(FEED_SOURCES.map(({ url, defaultDomain }) => fetchOneFeed(url, defaultDomain, raw, PER_FEED))),
-    globalTimeout,
-  ]);
-
-  // Deduplicate by normalized title prefix
-  const seen = new Set<string>();
-  return raw.filter(e => {
-    const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 48);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const res = await fetch("/api/signals", { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json() as { signals: FeedEvent[] };
+  return Array.isArray(data.signals) ? data.signals : [];
 }
 
 /* ── Boot Screen ────────────────────────────────────────────────────────── */

@@ -4,22 +4,27 @@
 RSR AXION is an Intelligence Synthesis System — a React + TypeScript + Vite single-page application that ingests live RSS news feeds, scores signals by severity and confidence, and generates executive intelligence briefs with threat matrix assessments.
 
 ## Architecture
-- **Framework**: React 18 + TypeScript
-- **Build tool**: Vite 5
+- **Frontend**: React 18 + TypeScript, bundled with Vite 5
+- **Backend**: Express.js API server (`server.mjs`) — fetches RSS feeds server-side, no CORS issues
 - **Styling**: Plain CSS (`src/index.css`)
 - **Icons**: lucide-react
-- **No backend** — fully client-side, uses localStorage for persistence
+- **Dev**: `concurrently` runs Express API on port 3001 + Vite dev server on port 5000; Vite proxies `/api` → 3001
+- **Production**: Express server on port 5000 serves `/api/signals` + built static `dist/` files
+- **Persistence**: localStorage only (no database)
 
 ## Project Layout
 ```
 /
 ├── index.html          # HTML entry point
-├── vite.config.ts      # Vite config (port 5000, host 0.0.0.0, allowedHosts: true)
+├── server.mjs          # Express API server — /api/signals, static serving in production
+├── vite.config.ts      # Vite config (port 5000, /api proxy → 3001)
 ├── tsconfig.json
 ├── package.json
+├── public/
+│   └── rsr-seal.png    # RSR seal image
 ├── src/
 │   ├── main.tsx        # React root
-│   ├── App.tsx         # Main app component (signal feed, brief generation, archive)
+│   ├── App.tsx         # Main app component (calls /api/signals, brief generation, archive)
 │   ├── index.css       # All styles
 │   └── lib/
 │       ├── types.ts    # TypeScript type definitions
@@ -28,8 +33,9 @@ RSR AXION is an Intelligence Synthesis System — a React + TypeScript + Vite si
 ```
 
 ## Key Features
-- Live RSS signal ingestion via allorigins.win CORS proxy — 15 feeds across geopolitics, defense, cyber, markets, and domestic policy
-- Per-feed 6s AbortController timeout + 9s global Promise.race fallback ensures no stall
+- **Server-side** RSS signal ingestion via `/api/signals` — Express fetches 15 feeds directly (no CORS issues)
+- 15 feeds across geopolitics, defense/security, cyber/infrastructure, markets/energy, domestic policy
+- Per-feed 6s AbortController timeout + 10s global Promise.race ceiling ensures no stall
 - Deduplication by normalized title prefix (48 chars) keeps queue clean
 - Threat matrix scoring (GUARDED / ELEVATED / HIGH / CRITICAL)
 - Pinned signals sort to top of queue and are prioritized in brief synthesis
