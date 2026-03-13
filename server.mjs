@@ -24,31 +24,59 @@ app.use((req, res, next) => {
 
 /* ── Feed Sources ─────────────────────────────────────────── */
 const FEED_SOURCES = [
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",           domain: "Global Affairs" },
-  { url: "https://www.theguardian.com/world/rss",                             domain: "Global Affairs" },
-  { url: "https://feeds.bbci.co.uk/news/world/rss.xml",                       domain: "Global Affairs" },
-  { url: "https://www.aljazeera.com/xml/rss/all.xml",                         domain: "Global Affairs" },
-  { url: "https://foreignpolicy.com/feed/",                                   domain: "Global Affairs" },
-  { url: "https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml", domain: "Security / Defense" },
-  { url: "https://breakingdefense.com/feed/",                                 domain: "Security / Defense" },
-  { url: "https://www.thedrive.com/the-war-zone/rss",                         domain: "Security / Defense" },
-  { url: "https://www.cisa.gov/news.xml",                                     domain: "Technology Systems" },
-  { url: "https://krebsonsecurity.com/feed/",                                 domain: "Technology Systems" },
-  { url: "https://www.darkreading.com/rss.xml",                               domain: "Technology Systems" },
-  { url: "https://www.theguardian.com/business/rss",                          domain: "Markets" },
+  // GEOPOLITICS / GLOBAL AFFAIRS
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",            domain: "Global Affairs" },
+  { url: "https://www.theguardian.com/world/rss",                              domain: "Global Affairs" },
+  { url: "https://feeds.bbci.co.uk/news/world/rss.xml",                        domain: "Global Affairs" },
+  { url: "https://www.aljazeera.com/xml/rss/all.xml",                          domain: "Global Affairs" },
+  { url: "https://foreignpolicy.com/feed/",                                    domain: "Global Affairs" },
+  { url: "https://feeds.npr.org/1001/rss.xml",                                 domain: "Global Affairs" },
+  { url: "https://www.foreignaffairs.com/rss.xml",                             domain: "Global Affairs" },
+  { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml",                        domain: "Global Affairs" },
+  { url: "https://feeds.skynews.com/feeds/rss/world.xml",                      domain: "Global Affairs" },
+  { url: "https://rss.dw.com/rdf/rss-en-all",                                  domain: "Global Affairs" },
+  { url: "https://theintercept.com/feed/?rss",                                 domain: "Global Affairs" },
+
+  // MILITARY / SECURITY / DEFENSE
+  { url: "https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml",  domain: "Security / Defense" },
+  { url: "https://breakingdefense.com/feed/",                                  domain: "Security / Defense" },
+  { url: "https://www.thedrive.com/the-war-zone/rss",                          domain: "Security / Defense" },
+  { url: "https://warontherocks.com/feed/",                                    domain: "Security / Defense" },
+  { url: "https://www.navalnews.com/feed/",                                    domain: "Security / Defense" },
+  { url: "https://www.defenseone.com/rss/all/",                                domain: "Security / Defense" },
+
+  // CYBERSECURITY / TECHNOLOGY SYSTEMS
+  { url: "https://www.cisa.gov/news.xml",                                      domain: "Technology Systems" },
+  { url: "https://krebsonsecurity.com/feed/",                                  domain: "Technology Systems" },
+  { url: "https://www.darkreading.com/rss.xml",                                domain: "Technology Systems" },
+  { url: "https://www.bleepingcomputer.com/feed/",                             domain: "Technology Systems" },
+  { url: "https://threatpost.com/feed/",                                       domain: "Technology Systems" },
+  { url: "https://www.securityweek.com/feed/",                                 domain: "Technology Systems" },
+
+  // MARKETS / ENERGY / ECONOMICS
+  { url: "https://www.theguardian.com/business/rss",                           domain: "Markets" },
   { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19836768", domain: "Markets" },
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",        domain: "Domestic / Policy" },
-  { url: "https://thehill.com/feed/",                                         domain: "Domestic / Policy" },
+  { url: "https://www.cnbc.com/id/100003114/device/rss/rss.html",              domain: "Markets" },
+  { url: "https://oilprice.com/rss/main",                                      domain: "Markets" },
+  { url: "https://www.freightwaves.com/news/feed",                             domain: "Markets" },
+  { url: "https://feeds.content.dowjones.io/public/rss/mw_topstories",        domain: "Markets" },
+
+  // DOMESTIC / POLICY
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",         domain: "Domestic / Policy" },
+  { url: "https://thehill.com/feed/",                                          domain: "Domestic / Policy" },
+  { url: "https://rss.politico.com/politics-news.xml",                         domain: "Domestic / Policy" },
 ];
 
+/* ── Domain Classifier ────────────────────────────────────── */
 function classifyDomain(title, fallback) {
   if (/military|missile|drone|defense|navy|air.?force|troops|combat|weapon|warship|fighter|bomb|strike|war|conflict|artillery/i.test(title)) return "Security / Defense";
   if (/cyber|ransomware|hack|malware|infrastructure|ai\b|compute|chip|cloud|data.?breach|vulnerability|exploit|zero.?day|botnet/i.test(title)) return "Technology Systems";
-  if (/market|oil|energy|shipping|trade|treasury|inflation|equity|tariff|sanction|commodity|port|supply.?chain|crude|lng|brent|nasdaq|dow/i.test(title)) return "Markets";
+  if (/market|oil|energy|shipping|trade|treasury|inflation|equity|tariff|sanction|commodity|port|supply.?chain|crude|lng|brent|nasdaq|dow|freight/i.test(title)) return "Markets";
   if (/white house|senate|congress|executive|agency|department|administration|federal|election|legislation|policy|vote|president|minister|parliament/i.test(title)) return "Domestic / Policy";
   return fallback;
 }
 
+/* ── Utilities ────────────────────────────────────────────── */
 function decodeEntities(str) {
   return str
     .replace(/&amp;/g, "&")
@@ -66,9 +94,21 @@ function extractTag(xml, tag) {
   return m ? decodeEntities(m[1].trim()) : "";
 }
 
+function extractLink(block) {
+  // Prefer <link> text content; fall back to href attr on <link> or <guid>
+  const linkTag = block.match(/<link>([^<]+)<\/link>/i);
+  if (linkTag) return decodeEntities(linkTag[1].trim());
+  const hrefAttr = block.match(/<link[^>]+href=["']([^"']+)["']/i);
+  if (hrefAttr) return hrefAttr[1].trim();
+  const guid = extractTag(block, "guid");
+  if (guid && guid.startsWith("http")) return guid;
+  return "";
+}
+
+/* ── Feed Fetcher ─────────────────────────────────────────── */
 async function fetchFeed(url, fallbackDomain, perFeed) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  const timer = setTimeout(() => controller.abort(), 5000);
   const start = Date.now();
   try {
     const res = await fetch(url, {
@@ -94,12 +134,18 @@ async function fetchFeed(url, fallbackDomain, perFeed) {
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 220);
+      const link = extractLink(block);
+      const pubDate = extractTag(block, "pubDate") || extractTag(block, "dc:date") || "";
+      const domain = classifyDomain(title, fallbackDomain);
       results.push({
         id: `srv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         source: "RSR Signal Feed",
-        domain: classifyDomain(title, fallbackDomain),
+        domain,
+        category: domain,
         title,
         summary: desc,
+        link,
+        published: pubDate,
         severity: Math.floor(Math.random() * 4) + 1,
         confidence: 68 + Math.floor(Math.random() * 27),
         timestamp: new Date().toISOString(),
@@ -118,12 +164,12 @@ async function fetchFeed(url, fallbackDomain, perFeed) {
 
 /* ── /api/health ──────────────────────────────────────────── */
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString(), static: SERVE_STATIC, port: PORT });
+  res.json({ status: "ok", timestamp: new Date().toISOString(), static: SERVE_STATIC, port: PORT, feeds: FEED_SOURCES.length });
 });
 
 /* ── /api/signals ─────────────────────────────────────────── */
 app.get("/api/signals", async (req, res) => {
-  const PER_FEED = 12;
+  const PER_FEED = 15;
   const started = Date.now();
 
   const settled = await Promise.race([
@@ -140,11 +186,17 @@ app.get("/api/signals", async (req, res) => {
     return r.value.items;
   });
 
-  const seen = new Set();
+  // Deduplicate by URL (exact) then by normalized title prefix
+  const seenUrls = new Set();
+  const seenTitles = new Set();
   const signals = raw.filter(e => {
+    if (e.link) {
+      if (seenUrls.has(e.link)) return false;
+      seenUrls.add(e.link);
+    }
     const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 48);
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
     return true;
   });
 
