@@ -106,6 +106,30 @@ const BROWSER_FEEDS: ReadonlyArray<{ url: string; domain: string }> = [
   { url: "https://rss.politico.com/politics-news.xml",                         domain: "Domestic / Policy" },
 ];
 
+/* ── Signal Exclusion Filter ────────────────────────────────────────────── */
+
+const EXCLUDED_KEYWORDS = [
+  "sports", "baseball", "soccer", "basketball", "football", "tennis", "golf",
+  "olympics", "nfl", "nba", "mlb", "nhl", "fifa", "world cup", "super bowl",
+  "entertainment", "celebrity", "celebrities", "movie", "movies", "film", "films",
+  "box office", "oscar", "grammy", "emmy", "music", "album", "concert", "tour",
+  "tv show", "television show", "sitcom", "reality show", "streaming show",
+  "fashion", "runway", "couture", "beauty tips", "makeup", "skincare",
+  "food", "recipe", "restaurant", "chef", "cooking", "cuisine",
+  "travel", "vacation", "tourist", "resort", "hotel", "cruise",
+  "lifestyle", "wellness", "fitness", "yoga", "diet", "weight loss",
+  "culture", "arts and crafts", "horoscope", "astrology",
+];
+
+const EXCLUDED_RE = new RegExp(
+  `\\b(${EXCLUDED_KEYWORDS.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`,
+  "i"
+);
+
+function isRelevantSignal(title: string): boolean {
+  return !EXCLUDED_RE.test(title);
+}
+
 /* ── Client-side Signal Collection (rss2json CORS proxy) ────────────────── */
 
 type Rss2JsonItem = { title?: string; link?: string; pubDate?: string; description?: string };
@@ -131,6 +155,7 @@ async function collectSignals(): Promise<{ signals: FeedEvent[]; debug?: Record<
         const items: FeedEvent[] = data.items.slice(0, PER_FEED).flatMap(item => {
           const title = (item.title ?? "").trim();
           if (!title || title.length < 6) return [];
+          if (!isRelevantSignal(title)) return [];
           const summary = (item.description ?? "")
             .replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
