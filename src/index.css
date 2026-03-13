@@ -92,12 +92,12 @@ body { margin: 0; background: #07080a; }
   gap: 10px;
 }
 .bootSeal {
-  width: 92px;
-  height: 92px;
+  width: 120px;
+  height: 120px;
   object-fit: contain;
   filter: invert(1);
-  opacity: .22;
-  margin-bottom: 6px;
+  opacity: .28;
+  margin-bottom: 8px;
   animation: bootFadeIn .8s ease both;
 }
 .bootLogo {
@@ -199,11 +199,11 @@ body { margin: 0; background: #07080a; }
 .brandGroup { display: flex; flex-direction: column; gap: 1px; }
 
 .headerSeal {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   filter: invert(1);
-  opacity: .32;
+  opacity: .42;
   flex-shrink: 0;
 }
 
@@ -703,49 +703,53 @@ body { margin: 0; background: #07080a; }
 }
 .archiveList {
   display: flex;
-  flex-direction: row;
-  gap: 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-.archiveList::-webkit-scrollbar { height: 3px; }
+.archiveList::-webkit-scrollbar { width: 3px; }
 .archiveList::-webkit-scrollbar-track { background: transparent; }
-.archiveList::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 3px; }
+.archiveList::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
 
 .archiveItem {
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 6px;
   background: rgba(255,255,255,.02);
-  padding: 10px 12px;
+  padding: 9px 11px;
   cursor: pointer;
   transition: border-color .13s, background .13s;
-  flex-shrink: 0;
-  width: 174px;
-  min-height: 56px;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
 }
 .archiveItem:hover { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.09); }
 .archiveItem.active {
   border-color: rgba(109,80,210,.3);
   background: rgba(109,80,210,.08);
 }
+.archiveItemBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 .archiveItemTitle {
   font-size: .74rem;
   font-weight: 600;
   color: #9ca3af;
-  line-height: 1.3;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .archiveItem.active .archiveItemTitle { color: #c4b5fd; }
 .archiveItemMeta {
-  font-size: .64rem;
+  font-size: .63rem;
   color: #4e5468;
   display: flex;
   align-items: center;
@@ -755,8 +759,8 @@ body { margin: 0; background: #07080a; }
 }
 
 .archiveThreatDot {
-  width: 5px;
-  height: 5px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;

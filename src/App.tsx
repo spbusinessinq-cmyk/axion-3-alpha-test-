@@ -677,11 +677,13 @@ export default function App() {
                         className={cx("archiveItem", entry.id === selectedArchive?.id && "active")}
                         onClick={() => { setSelectedArchiveId(entry.id); setRenameValue(entry.title); }}
                       >
-                        <div className="archiveItemTitle">{entry.title}</div>
-                        <div className="archiveItemMeta">
-                          <span className={cx("archiveThreatDot", entry.threat.toLowerCase())} />
-                          {entry.date} · {entry.mode}
-                          {entry.starred && <Star size={10} style={{ marginLeft: 4, color: "#fbbf24", flexShrink: 0 }} />}
+                        <span className={cx("archiveThreatDot", entry.threat.toLowerCase())} style={{ flexShrink: 0 }} />
+                        <div className="archiveItemBody">
+                          <div className="archiveItemTitle">{entry.title}</div>
+                          <div className="archiveItemMeta">
+                            {entry.date} · {entry.mode}
+                            {entry.starred && <Star size={10} style={{ marginLeft: 4, color: "#fbbf24", flexShrink: 0 }} />}
+                          </div>
                         </div>
                       </div>
                     ))}
