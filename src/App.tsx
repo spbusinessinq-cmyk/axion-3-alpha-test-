@@ -125,6 +125,7 @@ function BootScreen({ onDone }: { onDone: () => void }) {
       <div className="bootScanlines" />
       <div className="bootContent">
         <div className="bootLogoWrap">
+          <img className="bootSeal" src="/rsr-seal.png" alt="" />
           <div className="bootLogo">RSR <span className="bootLogoAxion">AXION</span></div>
           <div className="bootTagline">INTELLIGENCE SYNTHESIS SYSTEM</div>
         </div>
@@ -342,8 +343,11 @@ export default function App() {
       {/* ── Top Bar ─────────────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbarLeft">
-          <div className="brand">RSR <span className="brandAxion">AXION</span></div>
-          <div className="brandSub">Intelligence Synthesis System</div>
+          <img className="headerSeal" src="/rsr-seal.png" alt="" />
+          <div className="brandGroup">
+            <div className="brand">RSR <span className="brandAxion">AXION</span></div>
+            <div className="brandSub">Intelligence Synthesis System</div>
+          </div>
         </div>
         <div className="topbarRight">
           <button className={cx("btn modeBtn", mode === "daily" && "accent")} onClick={() => setMode("daily")}>Daily</button>
