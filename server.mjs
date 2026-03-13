@@ -162,9 +162,14 @@ async function fetchFeed(url, fallbackDomain, perFeed) {
   }
 }
 
+/* ── /health ──────────────────────────────────────────────── */
+app.get("/health", (req, res) => {
+  res.json({ status: "AXION ONLINE", timestamp: new Date().toISOString(), feeds: FEED_SOURCES.length });
+});
+
 /* ── /api/health ──────────────────────────────────────────── */
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString(), static: SERVE_STATIC, port: PORT, feeds: FEED_SOURCES.length });
+  res.json({ status: "AXION ONLINE", timestamp: new Date().toISOString(), static: SERVE_STATIC, port: PORT, feeds: FEED_SOURCES.length });
 });
 
 /* ── /api/signals ─────────────────────────────────────────── */
