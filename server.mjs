@@ -213,7 +213,7 @@ app.get("/api/signals", async (req, res) => {
 /* ── Static (when production build is present) ────────────── */
 if (SERVE_STATIC) {
   app.use(express.static(DIST));
-  app.get("*", (_, res) => res.sendFile(join(DIST, "index.html")));
+  app.use((_, res) => res.sendFile(join(DIST, "index.html")));
   console.log(`[RSR AXION] Serving static build from ${DIST}`);
 }
 
