@@ -84,17 +84,26 @@ export function clusterCounts(events: FeedEvent[]) {
   };
 }
 
-export function buildEscalationModel(matrix: ThreatMatrix, confidence: number): string {
+export function buildEscalationModel(matrix: ThreatMatrix, confidence: number, signalCount: number = 10): string {
   const severe = [matrix.conflict, matrix.markets, matrix.infrastructure, matrix.information].filter(
     x => x === "HIGH" || x === "CRITICAL"
   ).length;
+
+  const lowCoverage = signalCount < 6;
+  const lowConf = confidence < 76;
+  const caveat = lowCoverage
+    ? ` Note: Assessment is based on a limited signal set (${signalCount} items). Confidence in posture accuracy is reduced; additional signal ingestion is recommended before escalation decisions.`
+    : lowConf
+    ? ` Note: Average signal confidence is below threshold (${confidence}/100). Posture assessment should be treated as indicative, not conclusive.`
+    : "";
+
   if (matrix.overall === "CRITICAL" || severe >= 3)
-    return `Active cross-domain stress is confirmed across multiple intelligence clusters. The operating environment presents compounding risk vectors with limited buffer. Confidence: ${confidence}/100. Recommend heightened monitoring and executive-level escalation protocols.`;
+    return `Active cross-domain stress is indicated across multiple clusters. The operating environment presents compounding risk vectors. Confidence: ${confidence}/100. Recommend heightened monitoring and executive-level escalation protocols.${caveat}`;
   if (matrix.overall === "HIGH" || severe >= 2)
-    return `Elevated crossover pressure is visible between two or more active clusters. Secondary effects are plausible within the current cycle. Confidence: ${confidence}/100. Recommend sustained watch posture and brief preparation for leadership.`;
+    return `Elevated pressure is visible across two or more active clusters. Secondary effects are plausible within the current cycle. Confidence: ${confidence}/100. Recommend sustained watch posture.${caveat}`;
   if (matrix.overall === "ELEVATED")
-    return `Developing pressure is registered across at least one primary domain. The cycle remains fluid with potential for rapid escalation. Confidence: ${confidence}/100. Standard watch protocols apply with elevated reporting cadence.`;
-  return `Guarded posture holds across the current cycle. No immediate cross-domain escalation is indicated. Confidence: ${confidence}/100. Routine monitoring applies with standard reporting intervals.`;
+    return `Developing pressure is registered in at least one primary domain. The cycle remains fluid. Confidence: ${confidence}/100. Standard watch protocols apply with elevated reporting cadence.${caveat}`;
+  return `Guarded posture holds. No immediate cross-domain escalation is indicated at this time. Confidence: ${confidence}/100. Routine monitoring applies.${caveat}`;
 }
 
 export function buildSitrepBlock(
@@ -266,7 +275,7 @@ export function buildFullBrief(
   const briefTitle = depth === "quick" ? "Quick Brief" : mode === "weekly" ? "Weekly Brief" : "Daily Brief";
   const conf = averageConfidence(sourceSet);
   const headline = sourceSet.map(e => `• ${e.title}`).join("\n") || "• No primary signals identified.";
-  const escalation = buildEscalationModel(matrix, conf);
+  const escalation = buildEscalationModel(matrix, conf, sourceSet.length);
 
   const header = [
     "FROM THE OFFICE OF EXECUTIVE INTELLIGENCE",

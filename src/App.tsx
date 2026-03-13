@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDownToLine, CheckCircle2, Database, Download, EyeOff, FileText, Globe, Newspaper, Pin, Printer, Radar, ScrollText, Search, Shield, Sparkles, Star, StarOff, Wand2, Zap, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDownToLine, CheckCircle2, Database, Download, EyeOff, FileText, Globe, Newspaper, Pin, Printer, Radar, ScrollText, Search, Shield, Star, StarOff, Wand2, X, Zap } from "lucide-react";
 import type { ArchiveModeFilter, ArchiveSort, ArchiveThreatFilter, BriefDepth, ExportKind, FeedEvent, HistoryEntry, Mode, ThreatMatrix } from "./lib/types";
 import { averageConfidence, buildArticle, buildBulletin, buildFullBrief, buildPrintHtml, clusterCounts, downloadTextFile, formatThreatOrder, safeLoad, saveToStorage, scoreBand } from "./lib/utils";
+
+/* ── Constants ─────────────────────────────────────────────────────────── */
 
 const STORAGE_KEYS = {
   history: "rsr-axion-history-v6",
@@ -11,6 +13,13 @@ const STORAGE_KEYS = {
   excluded: "rsr-axion-excluded-v6",
 };
 
+const BOOT_STEPS = [
+  "INITIALIZING SIGNAL LAYER",
+  "LINKING INTELLIGENCE MODULES",
+  "VERIFYING ARCHIVE STATE",
+  "PREPARING BRIEFING CONSOLE",
+];
+
 const FALLBACK_SIGNALS: FeedEvent[] = [
   { id: "fallback-1", source: "RSR Fallback Feed", domain: "Security / Defense", title: "Regional military signaling remains elevated across Middle East maritime lanes", summary: "Fallback signal loaded because the preview environment blocked live feed requests.", severity: 4, confidence: 78, timestamp: new Date().toISOString() },
   { id: "fallback-2", source: "RSR Fallback Feed", domain: "Markets", title: "Energy and shipping sensitivity remain central to the current market picture", summary: "Fallback signal loaded because the preview environment blocked live feed requests.", severity: 3, confidence: 76, timestamp: new Date().toISOString() },
@@ -19,9 +28,33 @@ const FALLBACK_SIGNALS: FeedEvent[] = [
   { id: "fallback-5", source: "RSR Fallback Feed", domain: "Global Affairs", title: "Strategic shipping routes remain vulnerable to regional power signaling", summary: "Maritime pressure is still relevant to the broader intelligence cycle.", severity: 3, confidence: 75, timestamp: new Date().toISOString() },
 ];
 
-function classNames(...parts: Array<string | false | null | undefined>) {
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+
+function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
+
+function confidenceLabel(c: number) {
+  if (c >= 90) return "CONFIRMED";
+  if (c >= 80) return "HIGH";
+  if (c >= 70) return "MODERATE";
+  return "LOW";
+}
+
+function confidenceClass(c: number) {
+  if (c >= 90) return "confConfirmed";
+  if (c >= 80) return "confHigh";
+  if (c >= 70) return "confMod";
+  return "confLow";
+}
+
+function severityDots(s: number) {
+  return Array.from({ length: 4 }, (_, i) => (
+    <span key={i} className={cx("sevDot", i < s && "sevActive")} />
+  ));
+}
+
+/* ── Signal Fetch ───────────────────────────────────────────────────────── */
 
 async function fetchSignals(): Promise<FeedEvent[]> {
   const feeds = [
@@ -63,7 +96,57 @@ async function fetchSignals(): Promise<FeedEvent[]> {
   return results;
 }
 
+/* ── Boot Screen ────────────────────────────────────────────────────────── */
+
+function BootScreen({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0);
+  const [fading, setFading] = useState(false);
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    BOOT_STEPS.forEach((_, i) => {
+      timers.push(setTimeout(() => setStep(i + 1), 350 + i * 480));
+    });
+
+    const fadeDelay = 350 + BOOT_STEPS.length * 480 + 280;
+    timers.push(setTimeout(() => setFading(true), fadeDelay));
+
+    timers.push(setTimeout(() => {
+      if (!doneRef.current) { doneRef.current = true; onDone(); }
+    }, fadeDelay + 520));
+
+    return () => timers.forEach(clearTimeout);
+  }, [onDone]);
+
+  return (
+    <div className={cx("bootScreen", fading && "bootFading")}>
+      <div className="bootScanlines" />
+      <div className="bootContent">
+        <div className="bootLogoWrap">
+          <div className="bootLogo">RSR <span className="bootLogoAxion">AXION</span></div>
+          <div className="bootTagline">INTELLIGENCE SYNTHESIS SYSTEM</div>
+        </div>
+        <div className="bootDivider" />
+        <div className="bootSteps">
+          {BOOT_STEPS.map((label, i) => (
+            <div key={i} className={cx("bootStep", step > i && "bootStepActive", step > i + 1 && "bootStepDone")}>
+              <span className="bootStepDot" />
+              <span className="bootStepLabel">{label}</span>
+              {step > i && <span className="bootStepOk">OK</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main App ───────────────────────────────────────────────────────────── */
+
 export default function App() {
+  const [booting, setBooting] = useState(true);
   const [mode, setMode] = useState<Mode>("daily");
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [pinned, setPinned] = useState<FeedEvent[]>([]);
@@ -81,7 +164,6 @@ export default function App() {
   const [excludedIds, setExcludedIds] = useState<string[]>(() => safeLoad(STORAGE_KEYS.excluded, []));
   const [search, setSearch] = useState("");
   const [executiveBrief, setExecutiveBrief] = useState("");
-  const [booting, setBooting] = useState(true);
   const [loading, setLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -93,7 +175,6 @@ export default function App() {
   useEffect(() => saveToStorage(STORAGE_KEYS.verified, manualVerified), [manualVerified]);
   useEffect(() => saveToStorage(STORAGE_KEYS.excluded, excludedIds), [excludedIds]);
   useEffect(() => { void ingestSignals(); }, []);
-  useEffect(() => { const t = window.setTimeout(() => setBooting(false), 900); return () => window.clearTimeout(t); }, []);
 
   async function ingestSignals() {
     setLoading(true);
@@ -105,11 +186,11 @@ export default function App() {
       setEvents(usable);
       setPinned([]);
       setDismissed([]);
-      setStatusMessage(signals.length ? `Live signals pulled: ${usable.length}` : "Preview fallback loaded because live feed access was blocked.");
+      setStatusMessage(signals.length ? `Live signals pulled: ${usable.length}` : "Fallback mode — live feeds unavailable.");
     } catch {
       setUsingFallback(true);
       setEvents(FALLBACK_SIGNALS);
-      setStatusMessage("Preview fallback loaded because live feed access was blocked.");
+      setStatusMessage("Fallback mode — live feeds unavailable.");
     } finally {
       setLoading(false);
     }
@@ -133,9 +214,9 @@ export default function App() {
 
   const patterns = useMemo(() => {
     const out: string[] = [];
-    if (counts.conflict && counts.markets) out.push("Conflict and market clusters are moving in parallel, increasing cross-domain sensitivity.");
-    if (counts.markets && counts.infrastructure) out.push("Infrastructure and market signals are overlapping through logistics, energy, and compute exposure.");
-    if (counts.information && counts.conflict) out.push("Policy movement is reinforcing the wider conflict operating picture.");
+    if (counts.conflict >= 2 && counts.markets >= 2) out.push("Conflict and market clusters are co-moving, increasing cross-domain sensitivity.");
+    if (counts.markets >= 2 && counts.infrastructure >= 2) out.push("Infrastructure and market signals are overlapping through logistics, energy, and compute exposure.");
+    if (counts.information >= 2 && counts.conflict >= 2) out.push("Policy movement is reinforcing the wider conflict operating picture.");
     return out;
   }, [counts]);
 
@@ -143,7 +224,7 @@ export default function App() {
     { label: "RSR Verified", value: String(visibleEvents.filter(e => e.confidence >= 85 || !!manualVerified[e.id]).length), accent: "purple" },
     { label: "Live Signals", value: String(visibleEvents.length), accent: "white" },
     { label: "Used In Brief", value: String(Object.values(usedInBrief).filter(Boolean).length), accent: "amber" },
-    { label: "Confidence", value: String(averageConfidence(visibleEvents)), accent: "green" },
+    { label: "Confidence", value: visibleEvents.length ? String(averageConfidence(visibleEvents)) : "—", accent: "green" },
   ], [visibleEvents, manualVerified, usedInBrief]);
 
   function generateBrief(depth: BriefDepth) {
@@ -210,19 +291,19 @@ export default function App() {
     }
   }, [selectedArchive, selectedArchiveId]);
 
-  function handleExport(kind: ExportKind, customText?: string) {
+  function handleExport(kind: ExportKind) {
     const now = new Date();
     if (kind === "txt") {
-      const fallbackText = customText || executiveBrief || selectedArchive?.brief || "";
-      if (!fallbackText) { setStatusMessage("Generate or select a brief before exporting."); return; }
-      downloadTextFile(`rsr-axion-brief-${Date.now()}.txt`, fallbackText);
-      setStatusMessage("TXT export downloaded.");
+      const text = executiveBrief || selectedArchive?.brief || "";
+      if (!text) { setStatusMessage("Generate a brief first."); return; }
+      downloadTextFile(`rsr-axion-brief-${Date.now()}.txt`, text);
+      setStatusMessage("TXT exported.");
       return;
     }
     if (kind === "article") {
       const text = buildArticle(visibleEvents.slice(0, 12), threatMatrix, mode, now);
       downloadTextFile(`rsr-axion-article-${Date.now()}.txt`, text);
-      setStatusMessage("Article draft downloaded.");
+      setStatusMessage("Article downloaded.");
       return;
     }
     const text = buildBulletin(visibleEvents.slice(0, 10), threatMatrix, patterns, mode, now);
@@ -231,65 +312,64 @@ export default function App() {
   }
 
   function handlePrint() {
-    const printText = executiveBrief || selectedArchive?.brief || "";
-    if (!printText) { setStatusMessage("Generate or select a brief before printing."); return; }
+    const text = executiveBrief || selectedArchive?.brief || "";
+    if (!text) { setStatusMessage("Generate a brief first."); return; }
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) {
-      downloadTextFile(`rsr-axion-print-fallback-${Date.now()}.txt`, printText);
-      setStatusMessage("Print popup blocked. Downloaded print fallback instead.");
+      downloadTextFile(`rsr-axion-print-fallback-${Date.now()}.txt`, text);
+      setStatusMessage("Print popup blocked — downloaded as fallback.");
       return;
     }
-    w.document.write(buildPrintHtml(printText));
+    w.document.write(buildPrintHtml(text));
     w.document.close();
     w.focus();
     window.setTimeout(() => w.print(), 250);
   }
 
-  const tone = threatMatrix.overall === "CRITICAL" ? "critical" : threatMatrix.overall === "HIGH" ? "high" : threatMatrix.overall === "ELEVATED" ? "elevated" : "low";
+  const tone = threatMatrix.overall === "CRITICAL" ? "critical"
+    : threatMatrix.overall === "HIGH" ? "high"
+    : threatMatrix.overall === "ELEVATED" ? "elevated"
+    : "low";
 
-  if (booting) return (
-    <div className="boot">
-      <div className="bootCard">
-        <div className="bootTitle">RSR <span>AXION</span></div>
-        <div className="bootSub">INTELLIGENCE SYNTHESIS ENGINE</div>
-        <div className="bootLine"><Sparkles size={16} /> LOADING RSR SIGNALS</div>
-      </div>
-    </div>
-  );
+  if (booting) return <BootScreen onDone={() => setBooting(false)} />;
 
   return (
     <div className="app">
+
+      {/* ── Top Bar ─────────────────────────────────────────────── */}
       <header className="topbar">
-        <div>
-          <div className="brand">RSR <span>AXION</span></div>
-          <div className="sub">Intelligence Synthesis System</div>
+        <div className="topbarLeft">
+          <div className="brand">RSR <span className="brandAxion">AXION</span></div>
+          <div className="brandSub">Intelligence Synthesis System</div>
         </div>
-        <div className="row">
-          <button className={classNames("btn", mode === "daily" && "accent")} onClick={() => setMode("daily")}>Daily</button>
-          <button className={classNames("btn", mode === "weekly" && "accent")} onClick={() => setMode("weekly")}>Weekly</button>
+        <div className="topbarRight">
+          <button className={cx("btn modeBtn", mode === "daily" && "accent")} onClick={() => setMode("daily")}>Daily</button>
+          <button className={cx("btn modeBtn", mode === "weekly" && "accent")} onClick={() => setMode("weekly")}>Weekly</button>
         </div>
       </header>
 
       <main className="layout">
+
+        {/* ── Left Column ─────────────────────────────────────────── */}
         <section className="col">
 
           {/* Hero */}
           <div className="panel hero">
-            <div className="heroGlow"></div>
+            <div className="heroGlow" />
             <div className="heroCard">
-              <div className="row space">
+              <div className="heroTop">
                 <div>
                   <div className="eyebrow">Office of Executive Intelligence</div>
                   <div className="title">Strategic Briefing Console</div>
-                  <div className="copy">Tactical synthesis surface for signal intake, threat scoring, briefing generation, and portable reporting output.</div>
+                  <div className="copy">Tactical synthesis surface for signal intake, threat scoring, and portable reporting output.</div>
                 </div>
-                <div className={classNames("badge", tone)}>Threat Posture: {threatMatrix.overall}</div>
+                <div className={cx("badge", tone)}>Threat: {threatMatrix.overall}</div>
               </div>
               <div className="metrics">
                 {metricStrip.map(m => (
                   <div className="metric" key={m.label}>
                     <div className="smallLabel">{m.label}</div>
-                    <div className={classNames("metricValue", m.accent)}>{m.value}</div>
+                    <div className={cx("metricValue", m.accent)}>{m.value}</div>
                   </div>
                 ))}
               </div>
@@ -298,31 +378,31 @@ export default function App() {
 
           {/* Action Bar */}
           <div className="panel">
-            <div className="inner actionBar">
+            <div className="actionBar">
               <div className="actionGroup">
-                <button className="btn accent" onClick={() => void ingestSignals()}>
-                  <ArrowDownToLine size={15} /> {loading ? "Pulling..." : "Pull Signals"}
+                <button className="btn accent" onClick={() => void ingestSignals()} disabled={loading}>
+                  <ArrowDownToLine size={14} /> {loading ? "Pulling…" : "Pull Signals"}
                 </button>
                 <button className="btn" onClick={() => generateBrief("full")}>
-                  <Wand2 size={15} /> Run AXION
+                  <Wand2 size={14} /> Run AXION
                 </button>
                 <button className="btn" onClick={() => generateBrief("quick")}>
-                  <Zap size={15} /> Quick Brief
+                  <Zap size={14} /> Quick Brief
                 </button>
               </div>
               <div className="actionDivider" />
               <div className="actionGroup">
                 <button className="btn" onClick={() => handleExport("txt")}>
-                  <Download size={15} /> TXT
+                  <Download size={14} /> TXT
                 </button>
                 <button className="btn" onClick={() => handleExport("article")}>
-                  <Newspaper size={15} /> Article
+                  <Newspaper size={14} /> Article
                 </button>
                 <button className="btn" onClick={() => handleExport("bulletin")}>
-                  <ScrollText size={15} /> Bulletin
+                  <ScrollText size={14} /> Bulletin
                 </button>
                 <button className="btn" onClick={handlePrint}>
-                  <Printer size={15} /> Print
+                  <Printer size={14} /> Print
                 </button>
               </div>
             </div>
@@ -331,10 +411,10 @@ export default function App() {
           {/* Threat Matrix */}
           <div className="panel">
             <div className="inner">
-              <div className="iconHead"><Shield size={15} /> <span>Threat Matrix</span></div>
+              <div className="iconHead"><Shield size={14} /> <span>Threat Matrix</span></div>
               <div className="grid2">
-                <div className={classNames("card", tone)}>
-                  <div className="smallLabel">Overall Threat Posture</div>
+                <div className={cx("card", tone)}>
+                  <div className="smallLabel">Overall Posture</div>
                   <div className="big">{threatMatrix.overall}</div>
                 </div>
                 <div className="card">
@@ -342,11 +422,11 @@ export default function App() {
                   <div className="mid">{threatMatrix.conflict}</div>
                 </div>
                 <div className="card">
-                  <div className="smallLabel">Economic Stress Index</div>
+                  <div className="smallLabel">Economic Stress</div>
                   <div className="mid">{threatMatrix.markets}</div>
                 </div>
                 <div className="card">
-                  <div className="smallLabel">Infrastructure Exposure</div>
+                  <div className="smallLabel">Infrastructure</div>
                   <div className="mid">{threatMatrix.infrastructure}</div>
                 </div>
               </div>
@@ -356,10 +436,10 @@ export default function App() {
           {/* Pattern Detection */}
           <div className="panel">
             <div className="inner">
-              <div className="iconHead"><Radar size={15} /> <span>Pattern Detection</span></div>
+              <div className="iconHead"><Radar size={14} /> <span>Pattern Detection</span></div>
               {patterns.length
                 ? patterns.map((p, i) => <div key={i} className="patternItem">• {p}</div>)
-                : <div className="dimText">No major cross-signal cluster detected.</div>
+                : <div className="dimText">No cross-domain cluster patterns detected in current signal set.</div>
               }
             </div>
           </div>
@@ -367,14 +447,14 @@ export default function App() {
           {/* Executive Brief */}
           <div className="panel">
             <div className="inner">
-              <div className="iconHead"><FileText size={15} /> <span>Executive Intelligence Brief</span></div>
+              <div className="iconHead"><FileText size={14} /> <span>Executive Intelligence Brief</span></div>
               <div className="statusRow">
                 {usingFallback
-                  ? <div className="pill">Preview fallback mode</div>
-                  : <div className="pill"><Globe size={13} /> Live mode</div>
+                  ? <div className="pill warn">Fallback mode</div>
+                  : <div className="pill"><Globe size={12} /> Live feed</div>
                 }
-                <div className="pill"><Database size={13} /> Local persistence active</div>
-                {statusMessage ? <div className="pill">{statusMessage}</div> : null}
+                <div className="pill"><Database size={12} /> Persistence active</div>
+                {statusMessage && <div className="pill">{statusMessage}</div>}
               </div>
               <textarea
                 className="textarea"
@@ -386,55 +466,100 @@ export default function App() {
 
         </section>
 
+        {/* ── Right Column ─────────────────────────────────────────── */}
         <aside className="col">
 
           {/* Signal Search */}
           <div className="searchWrap">
-            <Search className="searchIcon" size={15} />
-            <input className="input" placeholder="Search signals" value={search} onChange={e => setSearch(e.target.value)} />
+            <Search className="searchIcon" size={14} />
+            <input className="input" placeholder="Search signals…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
 
           {/* Live Signal Queue */}
           <div className="panel">
             <div className="inner">
-              <div className="row space" style={{ marginBottom: 14 }}>
-                <div className="eyebrow">Live Queue</div>
-                <div className="queueCount">{visibleEvents.length}</div>
+              <div className="queueHeader">
+                <div className="iconHead" style={{ marginBottom: 0 }}><Globe size={14} /> <span>Live Signal Queue</span></div>
+                <div className="queueCount">{visibleEvents.length} signals</div>
               </div>
-              <div className="scroll">
+              {pinned.length > 0 && (
+                <div className="pinnedBanner">
+                  <Pin size={11} /> {pinned.length} pinned — AXION will brief these first
+                </div>
+              )}
+              <div className="scroll" style={{ marginTop: 12 }}>
                 {visibleEvents.length === 0
-                  ? <div className="dimText">No signals loaded.</div>
+                  ? <div className="dimText">No signals loaded. Pull signals to begin.</div>
                   : visibleEvents.map(event => {
                     const isPinned = !!pinned.find(r => r.id === event.id);
                     const isUsed = !!usedInBrief[event.id];
                     const isVerified = event.confidence >= 85 || !!manualVerified[event.id];
                     const isExcluded = excludedIds.includes(event.id);
                     return (
-                      <div key={event.id} className={classNames("event", isExcluded && "excluded")}>
+                      <div key={event.id} className={cx("event", isExcluded && "excluded", isPinned && "pinned")}>
+
+                        {/* Event header */}
                         <div className="eventHead">
                           <div className="eventTitle">{event.title}</div>
                           <div className="domain">{event.domain}</div>
                         </div>
-                        <div className="summary">{event.summary}</div>
-                        <div className="actions">
-                          <button className="smallBtn" onClick={() => setPinned(prev => prev.find(r => r.id === event.id) ? prev.filter(r => r.id !== event.id) : [...prev, event])}>
-                            <Pin size={13} /> {isPinned ? "Unpin" : "Pin"}
-                          </button>
-                          <button className="smallBtn" onClick={() => setDismissed(prev => prev.includes(event.id) ? prev : [...prev, event.id])}>
-                            <X size={13} /> Dismiss
-                          </button>
-                          <button className={classNames("smallBtn", isVerified && "verified")} onClick={() => setManualVerified(prev => ({ ...prev, [event.id]: !prev[event.id] }))}>
-                            <CheckCircle2 size={13} /> {isVerified ? "Verified" : "Verify"}
-                          </button>
-                          <button className={classNames("smallBtn", isExcluded && "warn")} onClick={() => setExcludedIds(prev => prev.includes(event.id) ? prev.filter(x => x !== event.id) : [...prev, event.id])}>
-                            <EyeOff size={13} /> {isExcluded ? "Restore" : "Exclude"}
-                          </button>
-                          {isUsed && <span className="usedTag">Used</span>}
-                          {isPinned && <span className="pinnedTag"><Pin size={11} /></span>}
+
+                        {/* Meta row: source, confidence, severity */}
+                        <div className="eventMeta">
+                          <span className="metaSource">{event.source}</span>
+                          <span className="metaSep">·</span>
+                          <span className={cx("metaConf", confidenceClass(event.confidence))}>
+                            {confidenceLabel(event.confidence)} {event.confidence}%
+                          </span>
+                          <span className="metaSep">·</span>
+                          <span className="metaSev">
+                            {severityDots(event.severity)}
+                          </span>
                         </div>
+
+                        {/* Summary */}
+                        {event.summary && <div className="summary">{event.summary}</div>}
+
+                        {/* State tags */}
+                        <div className="eventTags">
+                          {isPinned && <span className="eTag eTagPin"><Pin size={10} /> Pinned</span>}
+                          {isVerified && <span className="eTag eTagVerified"><CheckCircle2 size={10} /> Verified</span>}
+                          {isUsed && <span className="eTag eTagUsed">Used in brief</span>}
+                          {isExcluded && <span className="eTag eTagExcluded"><EyeOff size={10} /> Excluded</span>}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="actions">
+                          <button
+                            className={cx("smallBtn", isPinned && "active")}
+                            onClick={() => setPinned(prev => prev.find(r => r.id === event.id) ? prev.filter(r => r.id !== event.id) : [...prev, event])}
+                          >
+                            <Pin size={12} /> {isPinned ? "Unpin" : "Pin"}
+                          </button>
+                          <button
+                            className="smallBtn"
+                            onClick={() => setDismissed(prev => [...prev, event.id])}
+                          >
+                            <X size={12} /> Dismiss
+                          </button>
+                          <button
+                            className={cx("smallBtn", isVerified && "verified")}
+                            onClick={() => setManualVerified(prev => ({ ...prev, [event.id]: !prev[event.id] }))}
+                          >
+                            <CheckCircle2 size={12} /> {isVerified ? "Verified" : "Verify"}
+                          </button>
+                          <button
+                            className={cx("smallBtn", isExcluded && "warn")}
+                            onClick={() => setExcludedIds(prev => prev.includes(event.id) ? prev.filter(x => x !== event.id) : [...prev, event.id])}
+                          >
+                            <EyeOff size={12} /> {isExcluded ? "Restore" : "Exclude"}
+                          </button>
+                        </div>
+
+                        {/* Analyst note */}
                         <textarea
                           className="note"
-                          placeholder="Analyst note..."
+                          placeholder="Analyst note…"
                           value={analystNotes[event.id] || ""}
                           onChange={e => setAnalystNotes(prev => ({ ...prev, [event.id]: e.target.value }))}
                         />
@@ -446,27 +571,29 @@ export default function App() {
             </div>
           </div>
 
-          {/* Archive */}
+          {/* Intelligence Archive */}
           <div className="panel">
             <div className="inner">
-              <div className="iconHead"><Database size={15} /> <span>Intelligence Archive</span></div>
+              <div className="iconHead"><Database size={14} /> <span>Intelligence Archive</span></div>
 
+              {/* Archive Search */}
               <div className="archiveSearch">
-                <Search size={13} className="archiveSearchIcon" />
+                <Search size={12} className="archiveSearchIcon" />
                 <input
                   className="input"
-                  placeholder="Search archive..."
+                  placeholder="Search archive…"
                   value={archiveSearch}
                   onChange={e => setArchiveSearch(e.target.value)}
-                  style={{ paddingLeft: 34, fontSize: "0.82rem" }}
+                  style={{ paddingLeft: 32, fontSize: "0.8rem" }}
                 />
               </div>
 
+              {/* Filters */}
               <div className="filterSection">
                 <div className="filterLabel">Threat</div>
                 <div className="filterRow">
                   {(["ALL", "LOW", "ELEVATED", "HIGH", "CRITICAL"] as ArchiveThreatFilter[]).map(f => (
-                    <button key={f} className={classNames("filterChip", archiveThreatFilter === f && "active")} onClick={() => setArchiveThreatFilter(f)}>{f}</button>
+                    <button key={f} className={cx("filterChip", archiveThreatFilter === f && "active")} onClick={() => setArchiveThreatFilter(f)}>{f}</button>
                   ))}
                 </div>
               </div>
@@ -475,41 +602,44 @@ export default function App() {
                 <div className="filterLabel">Mode</div>
                 <div className="filterRow">
                   {(["ALL", "daily", "weekly", "quick"] as ArchiveModeFilter[]).map(f => (
-                    <button key={f} className={classNames("filterChip", archiveModeFilter === f && "active")} onClick={() => setArchiveModeFilter(f)}>{f}</button>
+                    <button key={f} className={cx("filterChip", archiveModeFilter === f && "active")} onClick={() => setArchiveModeFilter(f)}>{f}</button>
                   ))}
                 </div>
               </div>
 
-              <div className="filterSection" style={{ marginBottom: 14 }}>
+              <div className="filterSection" style={{ marginBottom: 16 }}>
                 <div className="filterLabel">Sort</div>
                 <div className="filterRow">
                   {(["newest", "oldest", "threat"] as ArchiveSort[]).map(s => (
-                    <button key={s} className={classNames("filterChip", archiveSort === s && "active")} onClick={() => setArchiveSort(s)}>{s}</button>
+                    <button key={s} className={cx("filterChip", archiveSort === s && "active")} onClick={() => setArchiveSort(s)}>{s}</button>
                   ))}
                 </div>
               </div>
 
               {archiveResults.length === 0 ? (
-                <div className="dimText" style={{ padding: "16px 0" }}>No archive entries yet. Generate a brief to save it here.</div>
+                <div className="dimText">No archive entries yet. Generate a brief to save here.</div>
               ) : (
                 <div className="archiveLayout">
+
+                  {/* List */}
                   <div className="archiveList">
                     {archiveResults.map(entry => (
                       <div
                         key={entry.id}
-                        className={classNames("archiveItem", entry.id === selectedArchive?.id && "active")}
+                        className={cx("archiveItem", entry.id === selectedArchive?.id && "active")}
                         onClick={() => { setSelectedArchiveId(entry.id); setRenameValue(entry.title); }}
                       >
                         <div className="archiveItemTitle">{entry.title}</div>
                         <div className="archiveItemMeta">
-                          <span className={classNames("archiveThreatDot", entry.threat.toLowerCase())} />
+                          <span className={cx("archiveThreatDot", entry.threat.toLowerCase())} />
                           {entry.date} · {entry.mode}
-                          {entry.starred && <Star size={11} style={{ marginLeft: 4, color: "#fbbf24" }} />}
+                          {entry.starred && <Star size={10} style={{ marginLeft: 4, color: "#fbbf24", flexShrink: 0 }} />}
                         </div>
                       </div>
                     ))}
                   </div>
 
+                  {/* Detail */}
                   {selectedArchive && (
                     <div className="archiveDetail">
                       <div className="archiveDetailControls">
@@ -517,38 +647,40 @@ export default function App() {
                           className="smallInput"
                           value={renameValue}
                           onChange={e => setRenameValue(e.target.value)}
-                          placeholder="Brief title..."
+                          placeholder="Brief title…"
                         />
                         <button className="smallBtn" onClick={() => setHistory(prev => prev.map(e => e.id === selectedArchive.id ? { ...e, title: renameValue } : e))}>
-                          <FileText size={13} /> Save
+                          Save
                         </button>
-                        <button className={classNames("smallBtn", selectedArchive.starred && "warn")} onClick={() => setHistory(prev => prev.map(e => e.id === selectedArchive.id ? { ...e, starred: !e.starred } : e))}>
-                          {selectedArchive.starred ? <StarOff size={13} /> : <Star size={13} />}
-                          {selectedArchive.starred ? "Unstar" : "Star"}
+                        <button
+                          className={cx("smallBtn", selectedArchive.starred && "warn")}
+                          onClick={() => setHistory(prev => prev.map(e => e.id === selectedArchive.id ? { ...e, starred: !e.starred } : e))}
+                        >
+                          {selectedArchive.starred ? <StarOff size={12} /> : <Star size={12} />}
                         </button>
-                        <button className="smallBtn" onClick={() => { downloadTextFile(`rsr-axion-archive-${selectedArchive.id}.txt`, selectedArchive.brief); setStatusMessage("Archive entry exported."); }}>
-                          <Download size={13} /> Export
+                        <button className="smallBtn" onClick={() => { downloadTextFile(`rsr-axion-${selectedArchive.id}.txt`, selectedArchive.brief); setStatusMessage("Exported."); }}>
+                          <Download size={12} />
                         </button>
                         <button className="smallBtn warn" onClick={() => { setHistory(prev => prev.filter(e => e.id !== selectedArchive.id)); setSelectedArchiveId(null); }}>
-                          <X size={13} /> Delete
+                          <X size={12} />
                         </button>
                       </div>
+
                       <div className="archiveTags">
-                        <span className={classNames("tag", selectedArchive.threat.toLowerCase())}>{selectedArchive.threat}</span>
+                        <span className={cx("tag", selectedArchive.threat.toLowerCase())}>{selectedArchive.threat}</span>
                         <span className="tag">{selectedArchive.mode}</span>
                         <span className="tag">{selectedArchive.date}</span>
                         <span className="tag">{selectedArchive.issue}</span>
                       </div>
+
                       <div className="archiveText">{selectedArchive.brief}</div>
-                      {selectedArchive.id in analystNotes && (
-                        <textarea
-                          className="note"
-                          style={{ marginTop: 10 }}
-                          placeholder="Archive analyst note..."
-                          value={analystNotes[selectedArchive.id] || ""}
-                          onChange={e => setAnalystNotes(prev => ({ ...prev, [selectedArchive.id]: e.target.value }))}
-                        />
-                      )}
+
+                      <textarea
+                        className="note"
+                        placeholder="Analyst note on this archive entry…"
+                        value={analystNotes[selectedArchive.id] || ""}
+                        onChange={e => setAnalystNotes(prev => ({ ...prev, [selectedArchive.id]: e.target.value }))}
+                      />
                     </div>
                   )}
                 </div>
