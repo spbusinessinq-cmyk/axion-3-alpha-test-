@@ -60,7 +60,7 @@ async function fetchSignals(): Promise<{ signals: FeedEvent[]; debug?: Record<st
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
-    const res = await fetch("/api/signals", { cache: "no-store", signal: controller.signal });
+    const res = await fetch("https://workspace.Chase97654.repl.co/api/signals", { cache: "no-store", signal: controller.signal });
     clearTimeout(timer);
     if (!res.ok) {
       console.warn(`[AXION] /api/signals → HTTP ${res.status} ${res.statusText}`);
