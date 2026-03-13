@@ -1,4 +1,42 @@
 import type { FeedEvent, ThreatMatrix } from "./types";
+
+function formatLaDateParts(now: Date) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+  const parts = dtf.formatToParts(now);
+  const pick = (type: string) => parts.find(p => p.type === type)?.value || "";
+  const date = `${pick("month")} ${pick("day")}, ${pick("year")}`;
+  const time = `${pick("hour")}:${pick("minute")}`;
+  return { date, time };
+}
+
+export function buildRealtimeHeader(intelligenceCycleLine: string = "INTELLIGENCE CYCLE: DAILY / WEEKLY / QUICK", now: Date = new Date()): string {
+  const { date, time } = formatLaDateParts(now);
+  return [
+    "FROM THE OFFICE OF EXECUTIVE INTELLIGENCE",
+    "RSR AXION – INTELLIGENCE SYNTHESIS SYSTEM",
+    "Location: Los Angeles, California",
+    `Date: ${date}`,
+    `Time: ${time}`,
+    intelligenceCycleLine,
+    ""
+  ].join("\n");
+}
+
+export function withRealtimeHeader(body: string, intelligenceCycleLine: string = "INTELLIGENCE CYCLE: DAILY / WEEKLY / QUICK", now: Date = new Date()): string {
+  const trimmed = (body || "").replace(/^\s+/, "");
+  const header = buildRealtimeHeader(intelligenceCycleLine, now);
+  if (trimmed.startsWith("FROM THE OFFICE OF EXECUTIVE INTELLIGENCE")) return body;
+  return `${header}${trimmed}`;
+}
+
 export function scoreBand(value:number):string{ if(value>=8) return "CRITICAL"; if(value>=6) return "HIGH"; if(value>=3) return "ELEVATED"; return "LOW"; }
 export function averageConfidence(events:FeedEvent[]):number{ if(!events.length) return 0; return Math.round(events.reduce((s,e)=>s+e.confidence,0)/events.length); }
 export function formatThreatOrder(threat:string):number{ const rank:Record<string,number>={CRITICAL:4,HIGH:3,ELEVATED:2,LOW:1}; return rank[threat]||0; }
