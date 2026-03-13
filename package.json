@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n API,VITE -c cyan,yellow \"PORT=3001 node server.mjs\" \"vite\"",
     "dev:vite": "vite",
-    "dev:api": "PORT=3001 node server.mjs",
+    "dev:api": "PORT=3001 NODE_ENV=development node server.mjs",
     "start": "NODE_ENV=production node server.mjs",
     "build": "vite build",
     "preview": "vite preview"

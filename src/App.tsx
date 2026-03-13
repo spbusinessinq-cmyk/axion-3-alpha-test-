@@ -56,11 +56,26 @@ function severityDots(s: number) {
 
 /* ── Signal Fetch ───────────────────────────────────────────────────────── */
 
-async function fetchSignals(): Promise<FeedEvent[]> {
-  const res = await fetch("/api/signals", { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json() as { signals: FeedEvent[] };
-  return Array.isArray(data.signals) ? data.signals : [];
+async function fetchSignals(): Promise<{ signals: FeedEvent[]; debug?: Record<string, unknown> }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch("/api/signals", { cache: "no-store", signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) {
+      console.warn(`[AXION] /api/signals → HTTP ${res.status} ${res.statusText}`);
+      return { signals: [] };
+    }
+    const data = await res.json() as { signals: FeedEvent[]; count?: number; debug?: Record<string, unknown> };
+    const signals = Array.isArray(data.signals) ? data.signals : [];
+    console.log(`[AXION] /api/signals → ${signals.length} signals`, data.debug ?? "");
+    return { signals, debug: data.debug };
+  } catch (err) {
+    clearTimeout(timer);
+    const reason = (err as { name?: string })?.name === "AbortError" ? "client timeout (15s)" : String(err);
+    console.error(`[AXION] fetchSignals failed: ${reason}`);
+    return { signals: [] };
+  }
 }
 
 /* ── Boot Screen ────────────────────────────────────────────────────────── */
@@ -148,17 +163,30 @@ export default function App() {
     setLoading(true);
     setStatusMessage("");
     try {
-      const signals = await fetchSignals();
-      const usable = signals.length ? signals : FALLBACK_SIGNALS;
-      setUsingFallback(!signals.length);
+      const { signals, debug } = await fetchSignals();
+      const live = signals.length > 0;
+      const usable = live ? signals : FALLBACK_SIGNALS;
+      setUsingFallback(!live);
       setEvents(usable);
       setPinned([]);
       setDismissed([]);
-      setStatusMessage(signals.length ? `Live signals pulled: ${usable.length}` : "Fallback mode — live feeds unavailable.");
-    } catch {
+      if (live) {
+        const ok = (debug as { successFeeds?: number } | undefined)?.successFeeds;
+        const fail = (debug as { failFeeds?: number } | undefined)?.failFeeds;
+        const feedInfo = (ok != null && fail != null) ? ` (${ok}/${ok + fail} feeds)` : "";
+        setStatusMessage(`Live signals pulled: ${signals.length}${feedInfo}`);
+      } else {
+        const reason = (debug as { failFeeds?: number } | undefined)?.failFeeds != null
+          ? `0 of ${(debug as { failFeeds: number }).failFeeds} feeds responded`
+          : "no live signals returned";
+        setStatusMessage(`Fallback mode — ${reason}.`);
+        console.warn("[AXION] fallback activated —", debug ?? "no debug info");
+      }
+    } catch (err) {
       setUsingFallback(true);
       setEvents(FALLBACK_SIGNALS);
-      setStatusMessage("Fallback mode — live feeds unavailable.");
+      setStatusMessage("Fallback mode — ingestion error.");
+      console.error("[AXION] ingestSignals caught:", err);
     } finally {
       setLoading(false);
     }
