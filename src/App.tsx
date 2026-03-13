@@ -54,28 +54,131 @@ function severityDots(s: number) {
   ));
 }
 
-/* ── Signal Fetch ───────────────────────────────────────────────────────── */
+/* ── Domain Classifier ──────────────────────────────────────────────────── */
 
-async function fetchSignals(): Promise<{ signals: FeedEvent[]; debug?: Record<string, unknown> }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch("https://workspace.Chase97654.repl.co/api/signals", { cache: "no-store", signal: controller.signal });
-    clearTimeout(timer);
-    if (!res.ok) {
-      console.warn(`[AXION] /api/signals → HTTP ${res.status} ${res.statusText}`);
-      return { signals: [] };
-    }
-    const data = await res.json() as { signals: FeedEvent[]; count?: number; debug?: Record<string, unknown> };
-    const signals = Array.isArray(data.signals) ? data.signals : [];
-    console.log(`[AXION] /api/signals → ${signals.length} signals`, data.debug ?? "");
-    return { signals, debug: data.debug };
-  } catch (err) {
-    clearTimeout(timer);
-    const reason = (err as { name?: string })?.name === "AbortError" ? "client timeout (15s)" : String(err);
-    console.error(`[AXION] fetchSignals failed: ${reason}`);
-    return { signals: [] };
-  }
+function classifyDomain(title: string, fallback: string): string {
+  if (/military|missile|drone|defense|navy|air.?force|troops|combat|weapon|warship|fighter|bomb|strike|war|conflict|artillery/i.test(title)) return "Security / Defense";
+  if (/cyber|ransomware|hack|malware|infrastructure|ai\b|compute|chip|cloud|data.?breach|vulnerability|exploit|zero.?day|botnet/i.test(title)) return "Technology Systems";
+  if (/market|oil|energy|shipping|trade|treasury|inflation|equity|tariff|sanction|commodity|port|supply.?chain|crude|lng|brent|nasdaq|dow|freight/i.test(title)) return "Markets";
+  if (/white house|senate|congress|executive|agency|department|administration|federal|election|legislation|policy|vote|president|minister|parliament/i.test(title)) return "Domestic / Policy";
+  return fallback;
+}
+
+/* ── Browser Feed Sources ───────────────────────────────────────────────── */
+
+const BROWSER_FEEDS: ReadonlyArray<{ url: string; domain: string }> = [
+  // Global Affairs
+  { url: "https://feeds.bbci.co.uk/news/world/rss.xml",                        domain: "Global Affairs" },
+  { url: "https://www.aljazeera.com/xml/rss/all.xml",                          domain: "Global Affairs" },
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",             domain: "Global Affairs" },
+  { url: "https://rss.dw.com/rdf/rss-en-all",                                  domain: "Global Affairs" },
+  { url: "https://feeds.skynews.com/feeds/rss/world.xml",                      domain: "Global Affairs" },
+  { url: "https://feeds.npr.org/1001/rss.xml",                                 domain: "Global Affairs" },
+  { url: "https://feeds.a.dj.com/rss/RSSWorldNews.xml",                        domain: "Global Affairs" },
+  { url: "https://www.foreignaffairs.com/rss.xml",                             domain: "Global Affairs" },
+  { url: "https://foreignpolicy.com/feed/",                                    domain: "Global Affairs" },
+  { url: "https://theintercept.com/feed/?rss",                                 domain: "Global Affairs" },
+  { url: "https://www.theguardian.com/world/rss",                              domain: "Global Affairs" },
+  // Security / Defense
+  { url: "https://warontherocks.com/feed/",                                    domain: "Security / Defense" },
+  { url: "https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml",  domain: "Security / Defense" },
+  { url: "https://breakingdefense.com/feed/",                                  domain: "Security / Defense" },
+  { url: "https://www.thedrive.com/the-war-zone/rss",                          domain: "Security / Defense" },
+  { url: "https://www.defenseone.com/rss/all/",                                domain: "Security / Defense" },
+  { url: "https://www.navalnews.com/feed/",                                    domain: "Security / Defense" },
+  // Technology Systems / Cyber
+  { url: "https://krebsonsecurity.com/feed/",                                  domain: "Technology Systems" },
+  { url: "https://www.bleepingcomputer.com/feed/",                             domain: "Technology Systems" },
+  { url: "https://www.darkreading.com/rss.xml",                                domain: "Technology Systems" },
+  { url: "https://www.securityweek.com/feed/",                                 domain: "Technology Systems" },
+  { url: "https://threatpost.com/feed/",                                       domain: "Technology Systems" },
+  { url: "https://www.cisa.gov/news.xml",                                      domain: "Technology Systems" },
+  // Markets / Energy
+  { url: "https://www.theguardian.com/business/rss",                           domain: "Markets" },
+  { url: "https://www.cnbc.com/id/100003114/device/rss/rss.html",              domain: "Markets" },
+  { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19836768", domain: "Markets" },
+  { url: "https://oilprice.com/rss/main",                                      domain: "Markets" },
+  { url: "https://feeds.content.dowjones.io/public/rss/mw_topstories",         domain: "Markets" },
+  { url: "https://www.freightwaves.com/news/feed",                             domain: "Markets" },
+  // Domestic / Policy
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",          domain: "Domestic / Policy" },
+  { url: "https://thehill.com/feed/",                                          domain: "Domestic / Policy" },
+  { url: "https://rss.politico.com/politics-news.xml",                         domain: "Domestic / Policy" },
+];
+
+/* ── Client-side Signal Collection (rss2json CORS proxy) ────────────────── */
+
+type Rss2JsonItem = { title?: string; link?: string; pubDate?: string; description?: string };
+type Rss2JsonResponse = { status: string; items?: Rss2JsonItem[] };
+
+async function collectSignals(): Promise<{ signals: FeedEvent[]; debug?: Record<string, unknown> }> {
+  const PER_FEED = 12;
+  const started = Date.now();
+  let successCount = 0;
+  let failCount = 0;
+
+  const settled = await Promise.allSettled(
+    BROWSER_FEEDS.map(async ({ url, domain }) => {
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const res = await fetch(apiUrl, { signal: controller.signal, cache: "no-store" });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as Rss2JsonResponse;
+        if (data.status !== "ok" || !Array.isArray(data.items)) throw new Error("bad status");
+        const items: FeedEvent[] = data.items.slice(0, PER_FEED).flatMap(item => {
+          const title = (item.title ?? "").trim();
+          if (!title || title.length < 6) return [];
+          const summary = (item.description ?? "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 220);
+          let ts = new Date().toISOString();
+          try { if (item.pubDate) ts = new Date(item.pubDate).toISOString(); } catch { /* keep default */ }
+          return [{
+            id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            source: new URL(url).hostname.replace(/^(www|feeds|rss)\./i, ""),
+            domain: classifyDomain(title, domain),
+            title,
+            summary,
+            severity: Math.floor(Math.random() * 4) + 1,
+            confidence: 68 + Math.floor(Math.random() * 27),
+            timestamp: ts,
+          }];
+        });
+        successCount++;
+        return items;
+      } catch {
+        clearTimeout(timer);
+        failCount++;
+        return [] as FeedEvent[];
+      }
+    })
+  );
+
+  const raw = settled.flatMap(r => r.status === "fulfilled" ? r.value : []);
+
+  const seen = new Set<string>();
+  const signals = raw
+    .filter(e => {
+      const key = e.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 48);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 300);
+
+  const elapsed = Date.now() - started;
+  console.log(`[AXION] collectSignals feeds=${BROWSER_FEEDS.length} ok=${successCount} fail=${failCount} raw=${raw.length} deduped=${signals.length} time=${elapsed}ms`);
+
+  return {
+    signals,
+    debug: { successFeeds: successCount, failFeeds: failCount, rawCount: raw.length, elapsed },
+  };
 }
 
 /* ── Boot Screen ────────────────────────────────────────────────────────── */
@@ -163,7 +266,7 @@ export default function App() {
     setLoading(true);
     setStatusMessage("");
     try {
-      const { signals, debug } = await fetchSignals();
+      const { signals, debug } = await collectSignals();
       const live = signals.length > 0;
       const usable = live ? signals : FALLBACK_SIGNALS;
       setUsingFallback(!live);

@@ -46,7 +46,7 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "vm"
+deploymentTarget = "static"
 build = ["sh", "-c", "npm run build"]
 publicDir = "dist"
 run = ["sh", "-c", "npm install && npm start"]
