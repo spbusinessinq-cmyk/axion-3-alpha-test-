@@ -202,12 +202,15 @@ export default function App() {
       .filter(e => !excludedIds.includes(e.id))
       .filter(e => `${e.title} ${e.summary} ${e.domain} ${e.source}`.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
+        const ap = !!pinned.find(r => r.id === a.id);
+        const bp = !!pinned.find(r => r.id === b.id);
+        if (ap !== bp) return Number(bp) - Number(ap);
         const av = a.confidence >= 85 || !!manualVerified[a.id];
         const bv = b.confidence >= 85 || !!manualVerified[b.id];
         if (av !== bv) return Number(bv) - Number(av);
         return b.severity - a.severity;
       }),
-    [events, dismissed, excludedIds, search, manualVerified]
+    [events, dismissed, excludedIds, search, manualVerified, pinned]
   );
 
   const counts = useMemo(() => clusterCounts(visibleEvents), [visibleEvents]);
