@@ -28,11 +28,17 @@ RSR AXION is an Intelligence Synthesis System — a React + TypeScript + Vite si
 ```
 
 ## Key Features
-- Live RSS signal ingestion via allorigins.win proxy
+- Live RSS signal ingestion via allorigins.win CORS proxy — 15 feeds across geopolitics, defense, cyber, markets, and domestic policy
+- Per-feed 6s AbortController timeout + 9s global Promise.race fallback ensures no stall
+- Deduplication by normalized title prefix (48 chars) keeps queue clean
 - Threat matrix scoring (GUARDED / ELEVATED / HIGH / CRITICAL)
-- Brief generation (Quick Brief & Full AXION Report)
-- Signal archive with search, filter, and sort
-- Export to TXT, Article draft, Bulletin, and Print
+- Pinned signals sort to top of queue and are prioritized in brief synthesis
+- Brief generation: Quick Brief, Daily AXION Report, Weekly AXION Report
+- Signal archive with search, filter (threat/mode), sort, star, rename, analyst notes
+- Export: TXT download, Article draft, Bulletin, Print
+- RSR seal integrated: boot screen (92px, 22% opacity), header (42px, 32%), archive watermark (190px pseudo-element, 2.8%)
+- Boot screen: cinematic sequenced startup with scanlines and fade
+- localStorage persistence with -v6 storage keys
 
 ## Development
 ```bash
