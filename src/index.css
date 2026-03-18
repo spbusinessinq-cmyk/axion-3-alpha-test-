@@ -14,11 +14,6 @@ body { margin: 0; background: #07080a; }
 /* ═══════════════════════════════════════════════════════════
    BOOT SCREEN
 ═══════════════════════════════════════════════════════════ */
-@keyframes bootSweep {
-  0%   { transform: translateX(-100%); opacity: 0; }
-  40%  { opacity: 1; }
-  100% { transform: translateX(200%); opacity: 0; }
-}
 @keyframes bootFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -48,32 +43,14 @@ body { margin: 0; background: #07080a; }
   visibility: hidden;
 }
 
-/* Scanlines overlay */
-.bootScanlines {
+/* Vignette overlay */
+.bootVignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 3px,
-    rgba(0,0,0,.18) 3px,
-    rgba(0,0,0,.18) 4px
-  );
-}
-
-/* Light sweep */
-.bootScanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    rgba(100,90,160,.06) 50%,
-    transparent 65%
-  );
-  animation: bootSweep 2.8s ease-in-out infinite;
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 50%, transparent 0%, rgba(0,0,0,.5) 100%),
+    linear-gradient(180deg, rgba(0,0,0,.28) 0%, transparent 25%, transparent 75%, rgba(0,0,0,.36) 100%);
 }
 
 .bootContent {
@@ -115,8 +92,8 @@ body { margin: 0; background: #07080a; }
 }
 .bootTagline {
   font-size: .72rem;
-  letter-spacing: .4em;
-  color: #3a3d47;
+  letter-spacing: .38em;
+  color: #4a4f62;
   text-transform: uppercase;
   font-weight: 500;
 }
@@ -139,19 +116,19 @@ body { margin: 0; background: #07080a; }
   gap: 10px;
   opacity: 0;
   font-size: .72rem;
-  letter-spacing: .22em;
+  letter-spacing: .2em;
   text-transform: uppercase;
-  color: #2e3140;
+  color: #30344a;
   font-weight: 500;
   transition: color .3s;
 }
 .bootStep.bootStepActive {
   opacity: 1;
-  color: #4a4f64;
+  color: #5a6080;
   animation: bootStepIn .35s ease both;
 }
 .bootStep.bootStepDone {
-  color: #3a3d47;
+  color: #40455a;
 }
 
 .bootStepDot {
@@ -175,8 +152,22 @@ body { margin: 0; background: #07080a; }
 .bootStepOk {
   font-size: .62rem;
   letter-spacing: .18em;
-  color: rgba(80, 180, 100, .6);
+  color: rgba(80, 180, 100, .55);
   font-weight: 600;
+}
+
+.bootClassification {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: .58rem;
+  letter-spacing: .26em;
+  color: #28303a;
+  text-transform: uppercase;
+  font-weight: 500;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════════════

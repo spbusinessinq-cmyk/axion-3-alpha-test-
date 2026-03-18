@@ -217,22 +217,22 @@ function BootScreen({ onDone }: { onDone: () => void }) {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     BOOT_STEPS.forEach((_, i) => {
-      timers.push(setTimeout(() => setStep(i + 1), 350 + i * 480));
+      timers.push(setTimeout(() => setStep(i + 1), 280 + i * 380));
     });
 
-    const fadeDelay = 350 + BOOT_STEPS.length * 480 + 280;
+    const fadeDelay = 280 + BOOT_STEPS.length * 380 + 260;
     timers.push(setTimeout(() => setFading(true), fadeDelay));
 
     timers.push(setTimeout(() => {
       if (!doneRef.current) { doneRef.current = true; onDone(); }
-    }, fadeDelay + 520));
+    }, fadeDelay + 480));
 
     return () => timers.forEach(clearTimeout);
   }, [onDone]);
 
   return (
     <div className={cx("bootScreen", fading && "bootFading")}>
-      <div className="bootScanlines" />
+      <div className="bootVignette" />
       <div className="bootContent">
         <div className="bootLogoWrap">
           <img className="bootSeal" src="/rsr-seal.png" alt="" />
@@ -250,6 +250,7 @@ function BootScreen({ onDone }: { onDone: () => void }) {
           ))}
         </div>
       </div>
+      <div className="bootClassification">UNCLASSIFIED · RSR AXION · INTELLIGENCE SYNTHESIS SYSTEM</div>
     </div>
   );
 }
